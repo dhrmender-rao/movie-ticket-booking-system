@@ -1,3 +1,22 @@
 spring:
   application:
     name: Movie Ticket Booking
+
+  # Active profile — override via env var:  SPRING_PROFILES_ACTIVE=sit
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: bW92aWV0aWNrZXRib29raW5nc3lzdGVtc2VjcmV0a2V5Zm9yand0dG9rZW5nZW5lcmF0aW9u
+    expiration-ms: 86400000   # 24 hours
+
+  hold:
+    ttl-minutes: 10
+
+logging:
+  level:
+    org.example.ticketbooking: INFO
