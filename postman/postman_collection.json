@@ -1,0 +1,915 @@
+{
+  "info": {
+    "name": "Movie Ticket Booking API",
+    "_postman_id": "movie-ticket-booking-api",
+    "description": "Complete API collection for the Movie Ticket Booking system.\n\n## Setup\n1. Run the Spring Boot app (port 8080, PostgreSQL required)\n2. Use **Auth → Admin Login** to get an admin JWT — it is saved automatically as `adminToken`\n3. Use **Auth → Register Customer** then **Auth → Customer Login** — saved as `customerToken`\n4. Follow the numbered flow inside each folder top-to-bottom\n\n## Collection Variables\n| Variable | Description |\n|---|---|\n| `baseUrl` | API base URL (default: http://localhost:8080) |\n| `adminToken` | Set automatically after Admin Login |\n| `customerToken` | Set automatically after Customer Login |\n| `cityId` | Set automatically after Create City |\n| `theaterId` | Set automatically after Create Theater |\n| `screenId` | Set automatically after Create Screen |\n| `movieId` | Set automatically after Create Movie |\n| `showId` | Set automatically after Create Show |\n| `showSeatId1` | Set from Get Seat Map |\n| `showSeatId2` | Set from Get Seat Map |\n| `bookingId` | Set automatically after Create Booking |\n| `discountCodeId` | Set automatically after Create Discount Code |",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "customerToken", "value": "", "type": "string" },
+    { "key": "cityId", "value": "", "type": "string" },
+    { "key": "theaterId", "value": "", "type": "string" },
+    { "key": "screenId", "value": "", "type": "string" },
+    { "key": "movieId", "value": "", "type": "string" },
+    { "key": "showId", "value": "", "type": "string" },
+    { "key": "showSeatId1", "value": "", "type": "string" },
+    { "key": "showSeatId2", "value": "", "type": "string" },
+    { "key": "bookingId", "value": "", "type": "string" },
+    { "key": "discountCodeId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Registration and login endpoints. Run these first to obtain JWT tokens.",
+      "item": [
+        {
+          "name": "Register Customer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('customerToken', json.token);",
+                  "    console.log('Customer registered. Token saved.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Admin Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('adminToken', json.token);",
+                  "    console.log('Admin logged in. Token saved.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@movieticket.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Customer Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('customerToken', json.token);",
+                  "    console.log('Customer logged in. Token saved.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin — Setup",
+      "description": "Admin-only setup endpoints. Run these in order after Admin Login to set up the system.\n\nAll requests use `adminToken` automatically.",
+      "item": [
+        {
+          "name": "1. Create City",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('cityId', json.id);",
+                  "    console.log('cityId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"country\": \"India\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/cities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "cities"]
+            }
+          }
+        },
+        {
+          "name": "2. Create Theater",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('theaterId', json.id);",
+                  "    console.log('theaterId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"PVR Cinemas\",\n  \"address\": \"Phoenix Mall, Lower Parel\",\n  \"cityId\": {{cityId}}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/theaters",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "theaters"]
+            }
+          }
+        },
+        {
+          "name": "3. Create Screen",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('screenId', json.id);",
+                  "    console.log('screenId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Screen 1\",\n  \"theaterId\": {{theaterId}},\n  \"totalRows\": 10,\n  \"totalCols\": 15,\n  \"premiumRowsFromFront\": 3\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/screens",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "screens"]
+            }
+          }
+        },
+        {
+          "name": "4. Create Movie",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('movieId', json.id);",
+                  "    console.log('movieId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Interstellar\",\n  \"durationMinutes\": 169,\n  \"language\": \"English\",\n  \"genre\": \"Sci-Fi\",\n  \"rating\": \"U/A\",\n  \"description\": \"A team of explorers travel through a wormhole in space.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/movies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "movies"]
+            }
+          }
+        },
+        {
+          "name": "5. Create Show",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('showId', json.id);",
+                  "    console.log('showId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"movieId\": {{movieId}},\n  \"screenId\": {{screenId}},\n  \"startTime\": \"2026-07-01T18:00:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "shows"]
+            }
+          }
+        },
+        {
+          "name": "6. Create Pricing — Regular Weekday",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"seatType\": \"REGULAR\",\n  \"dayType\": \"WEEKDAY\",\n  \"basePrice\": 200.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/pricing",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "pricing"]
+            }
+          }
+        },
+        {
+          "name": "6. Create Pricing — Regular Weekend",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"seatType\": \"REGULAR\",\n  \"dayType\": \"WEEKEND\",\n  \"basePrice\": 250.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/pricing",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "pricing"]
+            }
+          }
+        },
+        {
+          "name": "6. Create Pricing — Premium Weekday",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"seatType\": \"PREMIUM\",\n  \"dayType\": \"WEEKDAY\",\n  \"basePrice\": 350.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/pricing",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "pricing"]
+            }
+          }
+        },
+        {
+          "name": "6. Create Pricing — Premium Weekend",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"seatType\": \"PREMIUM\",\n  \"dayType\": \"WEEKEND\",\n  \"basePrice\": 450.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/pricing",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "pricing"]
+            }
+          }
+        },
+        {
+          "name": "7. Create Discount Code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('discountCodeId', json.id);",
+                  "    console.log('discountCodeId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SAVE20\",\n  \"discountType\": \"PERCENTAGE\",\n  \"value\": 20,\n  \"maxUses\": 100,\n  \"validFrom\": \"2026-01-01T00:00:00\",\n  \"validTo\": \"2026-12-31T23:59:59\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discount-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discount-codes"]
+            }
+          }
+        },
+        {
+          "name": "7. Create Discount Code (Flat)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"FLAT50\",\n  \"discountType\": \"FLAT\",\n  \"value\": 50,\n  \"maxUses\": 50,\n  \"validFrom\": \"2026-01-01T00:00:00\",\n  \"validTo\": \"2026-12-31T23:59:59\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discount-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discount-codes"]
+            }
+          }
+        },
+        {
+          "name": "8. Create Refund Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hoursBeforeShow\": 48,\n  \"refundPercentage\": 100,\n  \"description\": \"Full refund if cancelled 48+ hours before show\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/refund-policies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "refund-policies"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin — Management",
+      "description": "Admin read and management endpoints.",
+      "item": [
+        {
+          "name": "Get All Cities",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/cities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "cities"]
+            }
+          }
+        },
+        {
+          "name": "Get Pricing for Show",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/pricing/show/{{showId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "pricing", "show", "{{showId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get All Discount Codes",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discount-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discount-codes"]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Discount Code",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discount-codes/{{discountCodeId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discount-codes", "{{discountCodeId}}", "deactivate"]
+            }
+          }
+        },
+        {
+          "name": "Get All Refund Policies",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/refund-policies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "refund-policies"]
+            }
+          }
+        },
+        {
+          "name": "Delete Refund Policy",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/refund-policies/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "refund-policies", "1"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Show (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/shows/{{showId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "shows", "{{showId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Public — Browse",
+      "description": "No authentication required.",
+      "item": [
+        {
+          "name": "Get All Cities",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/cities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cities"]
+            }
+          }
+        },
+        {
+          "name": "Get All Movies",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/movies",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "movies"]
+            }
+          }
+        },
+        {
+          "name": "Get Movie by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/{{movieId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "movies", "{{movieId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Shows by City",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/cities/{{cityId}}/shows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cities", "{{cityId}}", "shows"],
+              "query": [
+                { "key": "movieId", "value": "{{movieId}}", "disabled": true },
+                { "key": "date", "value": "2026-07-01", "disabled": true }
+              ]
+            },
+            "description": "Optional query params: `movieId` and `date` (yyyy-MM-dd) for filtering."
+          }
+        },
+        {
+          "name": "Get Shows by City + Movie Filter",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/cities/{{cityId}}/shows?movieId={{movieId}}&date=2026-07-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cities", "{{cityId}}", "shows"],
+              "query": [
+                { "key": "movieId", "value": "{{movieId}}" },
+                { "key": "date", "value": "2026-07-01" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Show by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/shows/{{showId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shows", "{{showId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Seat Map for Show",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const seats = pm.response.json();",
+                  "    const available = seats.filter(s => s.status === 'AVAILABLE');",
+                  "    if (available.length >= 2) {",
+                  "        pm.collectionVariables.set('showSeatId1', available[0].id);",
+                  "        pm.collectionVariables.set('showSeatId2', available[1].id);",
+                  "        console.log('showSeatId1=' + available[0].id + ', showSeatId2=' + available[1].id);",
+                  "    } else if (available.length === 1) {",
+                  "        pm.collectionVariables.set('showSeatId1', available[0].id);",
+                  "        console.log('Only 1 available seat: showSeatId1=' + available[0].id);",
+                  "    } else {",
+                  "        console.warn('No available seats found!');",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/shows/{{showId}}/seats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shows", "{{showId}}", "seats"]
+            },
+            "description": "Lists all seats with their current status (AVAILABLE / HELD / BOOKED).\nThe test script automatically extracts the first two AVAILABLE seat IDs into `showSeatId1` and `showSeatId2`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customer — Booking Flow",
+      "description": "Requires `customerToken`. Run in order:\n1. Hold Seats\n2. Create Booking\n3. Pay\n4. (Optional) Cancel Booking",
+      "item": [
+        {
+          "name": "1. Hold Seats",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showSeatIds\": [{{showSeatId1}}, {{showSeatId2}}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shows/{{showId}}/seats/hold",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shows", "{{showId}}", "seats", "hold"]
+            },
+            "description": "Holds the selected seats for 10 minutes. Must book before hold expires."
+          }
+        },
+        {
+          "name": "2. Create Booking (No Discount)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('bookingId', json.id);",
+                  "    console.log('bookingId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"showSeatIds\": [{{showSeatId1}}, {{showSeatId2}}],\n  \"discountCode\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "2. Create Booking (With Discount Code)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('bookingId', json.id);",
+                  "    console.log('bookingId set to ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"showSeatIds\": [{{showSeatId1}}, {{showSeatId2}}],\n  \"discountCode\": \"SAVE20\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "3. Pay for Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"cardToken\": \"tok_test_visa_1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/{{bookingId}}/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "{{bookingId}}", "pay"]
+            },
+            "description": "Simulates payment. 90% success rate (configurable). On success, booking status → CONFIRMED."
+          }
+        },
+        {
+          "name": "Get My Bookings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "{{bookingId}}"]
+            },
+            "description": "Cancels the booking and applies a time-based refund per refund policy.\nRefund tiers (default): 100% if ≥48h before show, 50% if 24–48h, 25% if 2–24h, 0% if <2h."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "description": "Requests that demonstrate expected error responses.",
+      "item": [
+        {
+          "name": "Login — Wrong Password (401)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@movieticket.com\",\n  \"password\": \"wrongpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Register — Duplicate Email (409)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Another User\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Admin Endpoint without Token (401)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/cities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "cities"]
+            }
+          }
+        },
+        {
+          "name": "Admin Endpoint with Customer Token (403)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/cities",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "cities"]
+            }
+          }
+        },
+        {
+          "name": "Book Without Holding Seats (409)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"showSeatIds\": [{{showSeatId1}}],\n  \"discountCode\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Invalid Discount Code (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"showId\": {{showId}},\n  \"showSeatIds\": [{{showSeatId1}}],\n  \"discountCode\": \"FAKECODE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Get Non-Existent Movie (404)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/movies/99999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "movies", "99999"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

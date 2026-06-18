@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;NON_KEYWORDS=VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+app:
+  jwt:
+    secret: dGVzdHNlY3JldGtleWZvcmp3dHRva2VuZ2VuZXJhdGlvbmluaW50ZWdyYXRpb250ZXN0cw==
+    expiration-ms: 3600000
+
+  hold:
+    ttl-minutes: 10
+
+  payment:
+    always-succeed: true
