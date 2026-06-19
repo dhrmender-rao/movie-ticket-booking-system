@@ -4,6 +4,7 @@ import org.example.ticketbooking.authanduser.entity.User;
 import org.example.ticketbooking.authanduser.structs.enums.Role;
 import org.example.ticketbooking.booking.entity.*;
 import org.example.ticketbooking.booking.service.SeatHoldService;
+import org.example.ticketbooking.booking.service.SeatLockRegistry;
 import org.example.ticketbooking.booking.structs.enums.SeatType;
 import org.example.ticketbooking.booking.structs.enums.ShowSeatStatus;
 import org.example.ticketbooking.booking.structs.enums.ShowStatus;
@@ -31,6 +32,7 @@ class SeatHoldServiceTest {
 
     @Mock ShowSeatRepository showSeatRepository;
     @Mock UserRepository userRepository;
+    @Mock SeatLockRegistry seatLockRegistry;
 
     @InjectMocks
     SeatHoldService seatHoldService;
@@ -38,6 +40,8 @@ class SeatHoldServiceTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(seatHoldService, "holdTtlMinutes", 10);
+        // Default: in-memory layer passes — tests focus on DB-layer logic unless overridden
+        when(seatLockRegistry.tryLockAll(any(), any())).thenReturn(true);
     }
 
     private User testUser() {
@@ -61,6 +65,8 @@ class SeatHoldServiceTest {
                 .status(ShowSeatStatus.AVAILABLE)
                 .build();
     }
+
+    // ─── Layer 2: DB-level validations (in-memory layer mocked to pass) ────────
 
     @Test
     void holdSeats_success() {
@@ -99,7 +105,7 @@ class SeatHoldServiceTest {
         User user = testUser();
         ShowSeat seat = availableSeat(1L, 10L);
         seat.setStatus(ShowSeatStatus.HELD);
-        seat.setHoldExpiresAt(LocalDateTime.now().plusMinutes(5)); // not expired
+        seat.setHoldExpiresAt(LocalDateTime.now().plusMinutes(5)); // active hold
 
         when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(user));
         when(showSeatRepository.findAllByIdWithLock(List.of(1L))).thenReturn(List.of(seat));
@@ -137,5 +143,35 @@ class SeatHoldServiceTest {
         assertThatThrownBy(() -> seatHoldService.holdSeats(10L, List.of(1L), "alice@test.com"))
                 .isInstanceOf(AppException.class)
                 .hasMessageContaining("does not belong to show");
+    }
+
+    // ─── Layer 1: in-memory fast-fail behaviour ─────────────────────────────────
+
+    @Test
+    void holdSeats_inMemoryLockFails_rejectsImmediately_withoutHittingDb() {
+        // Override default — in-memory gate rejects
+        when(seatLockRegistry.tryLockAll(any(), any())).thenReturn(false);
+        when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(testUser()));
+
+        assertThatThrownBy(() -> seatHoldService.holdSeats(10L, List.of(1L), "alice@test.com"))
+                .isInstanceOf(AppException.class)
+                .hasMessageContaining("currently being held");
+
+        // DB layer must never be reached — no connection consumed
+        verify(showSeatRepository, never()).findAllByIdWithLock(any());
+    }
+
+    @Test
+    void holdSeats_dbLayerThrows_releasesInMemoryLocks() {
+        // In-memory layer passes, but DB explodes (e.g. connection timeout)
+        when(userRepository.findByEmail("alice@test.com")).thenReturn(Optional.of(testUser()));
+        when(showSeatRepository.findAllByIdWithLock(any()))
+                .thenThrow(new RuntimeException("DB connection failed"));
+
+        assertThatThrownBy(() -> seatHoldService.holdSeats(10L, List.of(1L, 2L), "alice@test.com"))
+                .isInstanceOf(RuntimeException.class);
+
+        // In-memory locks must be released so the seats are not permanently blocked
+        verify(seatLockRegistry).releaseAll(List.of(1L, 2L));
     }
 }
