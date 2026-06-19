@@ -41,9 +41,19 @@ This was a deliberate refactoring step. Do not regress it.
 
 ### Seat reservation
 Two-phase: `AVAILABLE → HELD (10-min TTL) → BOOKED`.
-Hold uses `PESSIMISTIC_WRITE` (`SELECT FOR UPDATE`). Concurrent hold on the same seat → `409 CONFLICT`.
-`ShowSeat` has `@Version` as a secondary optimistic-lock guard.
-`HoldExpiryScheduler` releases expired holds every 60 s via a single bulk-update JPQL query.
+
+Hold uses **two concurrency layers**:
+
+1. **`SeatLockRegistry`** (in-memory, `ConcurrentHashMap<seatId, expiresAt>`) — fast-fail gate.
+   `tryLockAll()` uses `compute()` (atomic per key) with all-or-nothing rollback.
+   Rejects concurrent requests in microseconds without consuming a DB connection.
+   Cannot be the only guard: does not survive JVM restart, not shared across app instances.
+
+2. **`PESSIMISTIC_WRITE`** (`SELECT FOR UPDATE` via `@Lock`) — authoritative DB-level guard.
+   Correctness source of truth. Cannot be removed regardless of the in-memory layer.
+
+`ShowSeat` has `@Version` as a tertiary optimistic-lock guard.
+`HoldExpiryScheduler` runs every 60 s: bulk-releases expired DB holds AND calls `seatLockRegistry.evictExpired()` to keep the map bounded.
 
 ### Discount codes
 `DiscountService.applyDiscount(String code, BigDecimal totalPrice)` is the single public method.
@@ -116,6 +126,7 @@ Refund policies are NOT auto-seeded — create via `POST /api/admin/refund-polic
 - Do not re-introduce `validateCode()`, `calculateDiscount()`, or `incrementUsage()` as separate public methods on `DiscountService`.
 - Do not add helper methods like `getShowById(Long)` that return entities — they were deleted as dead code.
 - Do not add mocks for the database in integration tests — they use a real H2 context.
+- Do not remove the DB `PESSIMISTIC_WRITE` lock thinking the in-memory `SeatLockRegistry` is sufficient — the DB lock is the correctness guarantee; the in-memory layer is a performance optimisation only.
 - Do not put dev/test-specific settings in `application.yaml`.
 
 ---
@@ -127,7 +138,8 @@ When picking up a new task, these files give the fastest orientation:
 | File | Why |
 |---|---|
 | `booking/service/BookingService.java` | Central orchestrator — hold, book, pay, cancel |
-| `booking/service/SeatHoldService.java` | Pessimistic locking logic |
+| `booking/service/SeatLockRegistry.java` | In-memory fast-fail gate (ConcurrentHashMap) |
+| `booking/service/SeatHoldService.java` | Two-layer hold: SeatLockRegistry → DB pessimistic lock |
 | `booking/service/DiscountService.java` | Atomic discount flow |
 | `booking/service/NotificationService.java` | Async + REQUIRES_NEW pattern |
 | `common/config/SecurityConfig.java` | Auth rules, public vs protected endpoints |

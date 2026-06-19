@@ -183,19 +183,44 @@ cross a service method boundary. Cross-service calls pass only IDs or primitives
 
 ## Core Design Decisions
 
-### Seat reservation — two-phase with pessimistic locking
+### Seat reservation — two-phase with dual-layer locking
 
 Seat status transitions: `AVAILABLE → HELD → BOOKED`
 
-1. `POST /seats/hold` acquires a `SELECT FOR UPDATE` (pessimistic write lock) on the exact
-   `show_seats` rows. A second concurrent request for the same seat blocks and then fails with
-   `409 CONFLICT`. The hold gets a 10-minute TTL.
+1. `POST /seats/hold` runs through two concurrency layers before writing anything:
 2. `POST /bookings` validates the held seats belong to the caller and creates the booking as `PENDING`.
 3. `POST /payments/{id}/pay` confirms payment and moves seats to `BOOKED`.
 
-`HoldExpiryScheduler` runs every 60 seconds and releases expired holds via a single bulk-update query.
+**Layer 1 — In-memory fast-fail (`SeatLockRegistry`)**
 
-`ShowSeat` also carries `@Version` (optimistic lock) as a secondary guard.
+A `ConcurrentHashMap<seatId, expiresAt>` acts as a gate before any DB connection is used.
+`tryLockAll()` uses `ConcurrentHashMap.compute()` (atomic per key) with all-or-nothing semantics:
+if any seat is already claimed, every seat acquired in the same call is rolled back and the request
+returns `409 CONFLICT` immediately — in microseconds, with zero DB connections consumed.
+
+Without this layer, 1000 concurrent requests for the same seat would all queue on the DB row lock,
+exhausting the connection pool. With it, 999 fail in memory and only 1 reaches the database.
+
+**Layer 2 — DB pessimistic lock (`SELECT FOR UPDATE`)**
+
+`ShowSeatRepository.findAllByIdWithLock()` is annotated `@Lock(LockModeType.PESSIMISTIC_WRITE)`,
+which appends `FOR UPDATE` to the SQL. This is the authoritative correctness guarantee and cannot
+be removed because the in-memory map does not survive a JVM restart and is not shared across
+multiple app instances.
+
+**Why both are needed**
+
+| Scenario | In-memory layer | DB layer |
+|---|---|---|
+| 1000 requests, same JVM | Stops 999 at the gate | Confirms the 1 winner |
+| App restart (map wiped) | Gone — passes everything | Still enforces HELD status |
+| 2 app instances, load balancer | Each has its own map — both pass | Blocks the second at DB |
+
+`ShowSeat` also carries `@Version` (optimistic lock) as a tertiary guard against any edge case
+that slips past both layers.
+
+`HoldExpiryScheduler` runs every 60 seconds: releases expired DB holds via a single bulk-update
+query AND evicts expired entries from the in-memory map to keep it bounded.
 
 ### Dynamic, data-driven pricing
 
@@ -295,7 +320,8 @@ app:
 | File | Purpose |
 |---|---|
 | `booking/entity/ShowSeat.java` | Tracks seat status + hold TTL; carries `@Version` |
-| `booking/service/SeatHoldService.java` | Pessimistic locking for concurrent seat holds |
+| `booking/service/SeatLockRegistry.java` | In-memory fast-fail gate (ConcurrentHashMap) |
+| `booking/service/SeatHoldService.java` | Two-layer hold: in-memory fast-fail + DB pessimistic lock |
 | `booking/service/BookingService.java` | Full booking lifecycle |
 | `booking/service/DiscountService.java` | Atomic discount validate-calculate-increment |
 | `booking/service/PaymentService.java` | Mock payment + refund processing |
