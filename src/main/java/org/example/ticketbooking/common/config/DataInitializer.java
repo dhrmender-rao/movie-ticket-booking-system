@@ -21,11 +21,13 @@ public class DataInitializer {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefundPolicyRepository refundPolicyRepository;
 
     @Bean
     public CommandLineRunner initData() {
         return args -> {
             seedAdmin();
+            seedRefundPolicies();
         };
     }
 
@@ -39,6 +41,25 @@ public class DataInitializer {
                     .build();
             userRepository.save(admin);
             log.info("Seeded admin user: admin@movieticket.com / admin123");
+        }
+    }
+
+    private void seedRefundPolicies() {
+        if (refundPolicyRepository.count() == 0) {
+
+            refundPolicyRepository.save(RefundPolicy.builder()
+                    .hoursBeforeShow(24)
+                    .refundPercentage(new BigDecimal("50.00"))
+                    .description("50% refund if cancelled 24-48 hours before show")
+                    .build());
+
+            refundPolicyRepository.save(RefundPolicy.builder()
+                    .hoursBeforeShow(2)
+                    .refundPercentage(new BigDecimal("25.00"))
+                    .description("25% refund if cancelled 2-24 hours before show")
+                    .build());
+
+            log.info("Seeded default refund policies");
         }
     }
 }
